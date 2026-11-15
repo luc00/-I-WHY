@@ -229,11 +229,11 @@ export const HomePaperStage: React.FC<HomePaperStageProps> = ({ children }) => {
         {/* Central stage: Lateral "Tap and discover" arrow + Interactive folded white paper sheet */}
         <div className="relative mx-auto mt-8 max-w-[960px] sm:mt-10">
           {/* Lateral handwritten callout + hand-drawn arrow pointing to the sheet */}
-          <div className="mb-4 flex items-center justify-start lg:mb-0 lg:block">
+          <div className="mb-4 flex items-center justify-start min-[1360px]:mb-0 min-[1360px]:block">
             <button
               type="button"
               onClick={handleTapAndDiscover}
-              className="group relative inline-flex flex-col items-start text-left transition-transform duration-200 hover:translate-x-1 hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1D4ED8] lg:absolute lg:-left-[168px] lg:top-8 lg:z-20"
+              className="group relative inline-flex flex-col items-start text-left transition-transform duration-200 hover:translate-x-1 hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1D4ED8] min-[1360px]:absolute min-[1360px]:-left-[164px] min-[1360px]:top-8 min-[1360px]:z-20"
             >
               <span
                 className="inline-block -rotate-[9deg] text-[24px] font-bold leading-none text-[#252525] transition-colors group-hover:text-[#1D4ED8] sm:text-[26px] dark:text-[#E2E8F0] dark:group-hover:text-[#60A5FA]"
