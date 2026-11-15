@@ -1,0 +1,6 @@
+{
+  "name": "[I] WHY",
+  "description": "Esecutore intelligente e archivio privato crittografato end-to-end per comprendere i motivi dei tuoi comportamenti, trovare risoluzioni basate sulla ricerca e coltivare la consapevolezza personale nel tempo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

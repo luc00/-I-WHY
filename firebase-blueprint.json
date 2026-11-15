@@ -1,0 +1,190 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Account metadata for an authenticated vault owner without exposing PII to other users.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "displayLabel", "createdAt", "updatedAt"]
+    },
+    "VaultMetadata": {
+      "title": "VaultMetadata",
+      "description": "Zero-knowledge cryptographic salt and AES-GCM verifier token used to unlock the user's E2EE vault across devices.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "salt": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128
+        },
+        "verifierCiphertext": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 512
+        },
+        "verifierIv": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 64
+        },
+        "iterations": {
+          "type": "integer"
+        },
+        "keyVersion": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "salt",
+        "verifierCiphertext",
+        "verifierIv",
+        "iterations",
+        "keyVersion",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "EncryptedNote": {
+      "title": "EncryptedNote",
+      "description": "Client-side AES-256-GCM encrypted behavioral inquiry, psychological reflection, and resolution record.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 200000
+        },
+        "iv": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 64
+        },
+        "keyVersion": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["to_explore", "practicing", "integrated"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "ciphertext",
+        "iv",
+        "keyVersion",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "EncryptedContextProfile": {
+      "title": "EncryptedContextProfile",
+      "description": "Encrypted personal behavioral context (habits, triggers, personal goals) synchronized across the owner's devices.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 50000
+        },
+        "iv": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 64
+        },
+        "keyVersion": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "ciphertext",
+        "iv",
+        "keyVersion",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Owner-only user account document."
+    },
+    "/users/{userId}/vault/{vaultDocId}": {
+      "schema": { "$ref": "#/entities/VaultMetadata" },
+      "description": "Owner-only cryptographic vault metadata (docId: meta)."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/EncryptedNote" },
+      "description": "Owner-only AES-256-GCM encrypted behavioral notes synchronized in real time."
+    },
+    "/users/{userId}/context/{contextDocId}": {
+      "schema": { "$ref": "#/entities/EncryptedContextProfile" },
+      "description": "Owner-only encrypted personal behavioral context profile (docId: profile)."
+    }
+  }
+}

@@ -1,0 +1,248 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global hardened helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidNoteStatus(status) {
+      return status in ['to_explore', 'practicing', 'integrated'];
+    }
+
+    function isValidUserAccount(data, userId) {
+      return data.keys().hasAll(['ownerId', 'displayLabel', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'displayLabel', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.ownerId.size() <= 128
+        && data.displayLabel is string
+        && data.displayLabel.size() >= 1
+        && data.displayLabel.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVaultMetadata(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'salt', 'verifierCiphertext', 'verifierIv',
+          'iterations', 'keyVersion', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'salt', 'verifierCiphertext', 'verifierIv',
+          'iterations', 'keyVersion', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.ownerId.size() <= 128
+        && data.salt is string
+        && data.salt.size() >= 16
+        && data.salt.size() <= 128
+        && data.verifierCiphertext is string
+        && data.verifierCiphertext.size() >= 16
+        && data.verifierCiphertext.size() <= 512
+        && data.verifierIv is string
+        && data.verifierIv.size() >= 12
+        && data.verifierIv.size() <= 64
+        && data.iterations is int
+        && data.iterations >= 100000
+        && data.iterations <= 1000000
+        && data.keyVersion is int
+        && data.keyVersion >= 1
+        && data.keyVersion <= 1000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidEncryptedNote(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'ciphertext', 'iv', 'keyVersion', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ciphertext', 'iv', 'keyVersion', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.ownerId.size() <= 128
+        && data.ciphertext is string
+        && data.ciphertext.size() >= 16
+        && data.ciphertext.size() <= 200000
+        && data.iv is string
+        && data.iv.size() >= 12
+        && data.iv.size() <= 64
+        && data.keyVersion is int
+        && data.keyVersion >= 1
+        && data.keyVersion <= 1000
+        && data.status is string
+        && isValidNoteStatus(data.status)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidEncryptedContextProfile(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'ciphertext', 'iv', 'keyVersion', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ciphertext', 'iv', 'keyVersion', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.ownerId.size() <= 128
+        && data.ciphertext is string
+        && data.ciphertext.size() >= 16
+        && data.ciphertext.size() <= 50000
+        && data.iv is string
+        && data.iv.size() >= 12
+        && data.iv.size() <= 64
+        && data.keyVersion is int
+        && data.keyVersion >= 1
+        && data.keyVersion <= 1000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // /users/{userId}
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserAccount(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserAccount(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayLabel', 'updatedAt']);
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      // /users/{userId}/vault/{vaultDocId}
+      match /vault/{vaultDocId} {
+        allow get: if isValidId(userId)
+          && isValidId(vaultDocId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(vaultDocId)
+          && vaultDocId == 'meta'
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidVaultMetadata(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId)
+          && isValidId(vaultDocId)
+          && vaultDocId == 'meta'
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidVaultMetadata(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().keyVersion >= existing().keyVersion
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'salt', 'verifierCiphertext', 'verifierIv', 'iterations', 'keyVersion', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(vaultDocId) && isOwner(userId);
+      }
+
+      // /users/{userId}/notes/{noteId}
+      match /notes/{noteId} {
+        allow get: if isValidId(userId)
+          && isValidId(noteId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(noteId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidEncryptedNote(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId)
+          && isValidId(noteId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidEncryptedNote(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'ciphertext', 'iv', 'keyVersion', 'status', 'updatedAt'
+            ]) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          );
+        allow delete: if isValidId(userId) && isValidId(noteId) && isOwner(userId);
+      }
+
+      // /users/{userId}/context/{contextDocId}
+      match /context/{contextDocId} {
+        allow get: if isValidId(userId)
+          && isValidId(contextDocId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(contextDocId)
+          && contextDocId == 'profile'
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidEncryptedContextProfile(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId)
+          && isValidId(contextDocId)
+          && contextDocId == 'profile'
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidEncryptedContextProfile(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'ciphertext', 'iv', 'keyVersion', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(contextDocId) && isOwner(userId);
+      }
+    }
+  }
+}
